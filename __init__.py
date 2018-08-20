@@ -13,8 +13,10 @@ from opsdroid.matchers import match_regex, match_always
 # Templates for the !get updates command
 
 user_link = "https://matrix.to/#/{mxid}"
+event_link = "https://matrix.to/#/{room}/{event_id}"
 
-user_template = "[{{nick}}]({user_link}) reports that:".format(user_link=user_link)
+user_template = "[{{nick}}]({user_link}) [reports that]({event_link}):".format(user_link=user_link,
+                                                                               event_link=event_link)
 
 post_template = """
 {user_template}
