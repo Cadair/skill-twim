@@ -34,8 +34,7 @@ async def updates_page(opsdroid, request):
     Serve the updates summary page.
     """
     twim = await opsdroid.memory.get("twim")
-    twim = twim if twim else {"twim": []}
-    return {"updates": twim}
+    return twim if twim else {"twim": []}
 
 
 def setup(opsdroid):
