@@ -129,14 +129,14 @@ async def update(opsdroid, config, message):
         await message.respond(markdown.markdown(response))
 
 
-async def is_user_admin(api, room_id, mxid):
+async def user_has_pl(api, room_id, mxid, pl=100):
     """
     Determine if a user is admin in a given room.
     """
     pls = await api.get_power_levels(room_id)
     users = pls["users"]
     user_pl = users.get(mxid, 0)
-    return user_pl == 100
+    return user_pl == pl
 
 
 @match_regex("^!clear updates")
@@ -146,7 +146,7 @@ async def clear_updates(opsdroid, config, message):
     """
     connector = opsdroid.default_connector
     mxid = message.raw_message["sender"]
-    is_admin = await is_user_admin(connector.connection, message.room, mxid)
+    is_admin = await user_has_pl(connector.connection, message.room, mxid)
     if is_admin:
         await opsdroid.memory.put("twim", {"twim": []})
         await message.respond("Updates cleared")
