@@ -118,6 +118,11 @@ async def update(opsdroid, config, message):
     Send a message into the room with all the updates.
     """
     connector = opsdroid.default_connector
+    mxid = message.raw_message["sender"]
+    room_name = connector.get_roomname(message.room)
+    if room_name is "main" and not await user_has_pl(message.room, mxid):
+        return
+
     updates = await get_updates(opsdroid)
     twim = await opsdroid.memory.get("twim")
     if twim:
