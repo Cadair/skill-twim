@@ -1,10 +1,8 @@
 {% for update in twim %}
-
-
   [{{ update["nick"] }}](https://matrix.to/#/{{ update["mxid"] }}) [reports that](https://matrix.to/#/{{ update["room"] }}/{{ update["event_id"] }}):
 
 
-      > {{ update["message"]|replace("TWIM: ", "")|replace("TWIM", "")|replace("\n", "\n>")}}
+      > {{ update["message"]|replace("TWIM: ", "")|replace("TWIM", "")|replace("\n", "\n> ")}}
 
 
 {% endfor %}
