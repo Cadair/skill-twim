@@ -121,9 +121,7 @@ async def update(opsdroid, config, message):
     mxid = message.raw_message["sender"]
     room_name = connector.get_roomname(message.room)
     is_admin = await user_has_pl(connector.connection, message.room, mxid)
-    logging.debug(f"{room_name}, {is_admin}")
     if room_name == "main" and not is_admin:
-        logging.debug("User does not have permission to get updates")
         return
 
     updates = await get_updates(opsdroid)
