@@ -2,7 +2,7 @@
   [{{ update["nick"] }}](https://matrix.to/#/{{ update["mxid"] }}) [reports that](https://matrix.to/#/{{ update["room"] }}/{{ update["event_id"] }}):
 
 
-      {{ update["message"]|replace("TWIM: ", "")|replace("TWIM", "")}}
+      {{ update["message"]|replace("TWIM: ", "")|replace("TWIM", "")|indent(4)}}
 
 
 {% endfor %}
