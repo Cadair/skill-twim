@@ -37,6 +37,15 @@ async def updates_page(opsdroid, request):
     return twim if twim else {"twim": []}
 
 
+@aiohttp_jinja2.template('updates_md.j2')
+async def updates_md(opsdroid, request):
+    """
+    Serve the updates summary page.
+    """
+    twim = await opsdroid.memory.get("twim")
+    return twim if twim else {"twim": []}
+
+
 def setup(opsdroid):
     """
     Setup the skill. Register the twim route with the webserver.
@@ -49,6 +58,7 @@ def setup(opsdroid):
                          filters={"markdown": markdownf})
 
     app.router.add_get('/twim', partial(updates_page, opsdroid))
+    app.router.add_get('/twim.md', partial(updates_md, opsdroid))
 
 
 @match_regex("^TWIM")
