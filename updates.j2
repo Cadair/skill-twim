@@ -1,0 +1,18 @@
+<html>
+  <head>
+    <title> TWIM Posts</title>
+  </head>
+  <body>
+
+    {% for update in twim %}
+      <a href="https://matrix.to/#/{{ update["mxid"] }}">{{ update["nick"] }}</a>
+      <a href="https://matrix.to/#/{{ update["room"] }}/{{ update["event_id"] }}">reports that</a>:
+
+      <blockquote>
+        {{ update["message"]|replace("TWIM: ", "")|replace("TWIM", "")|markdown }}
+      </blockquote>
+
+    {% endfor %}
+
+  </body>
+</html>
