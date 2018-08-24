@@ -9,7 +9,7 @@
       <a href="https://matrix.to/#/{{ update["room"] }}/{{ update["event_id"] }}">reports that</a>:
 
       <blockquote>
-        {{ update["message"]|strip("TWIM: ")|strip("TWIM")|markdown }}
+        {{ update["message"]|replace("TWIM: ", "")|replace("TWIM", "")|markdown }}
       </blockquote>
 
     {% endfor %}
