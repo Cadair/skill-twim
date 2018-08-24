@@ -106,7 +106,12 @@ async def twim_bot(opsdroid, config, message):
 
 
 def format_update(post):
-    post["message"] = post["message"].strip("TWIM: ").strip("TWIM").replace("\n", "\n>")
+    message = post["message"]
+    if "TWIM: " in message:
+        message = message.replace("TWIM: ", "", 1)
+    else:
+        message = message.replace("TWIM", "", 1)
+    post["message"] = message.replace("\n", "\n>")
     return post_template.format(**post)
 
 
