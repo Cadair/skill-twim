@@ -102,7 +102,7 @@ async def twim_bot(opsdroid, config, message):
 
     # Send the update to the echo room.
     if "echo" in connector.rooms:
-        await message.respond(format_update(post), room="echo")
+        await message.respond(markdown.markdown(format_update(post), room="echo"))
 
 
 def format_update(post):
