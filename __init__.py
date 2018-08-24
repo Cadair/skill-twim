@@ -90,14 +90,24 @@ async def twim_bot(opsdroid, config, message):
     if not twim:
         twim = {"twim": []}
 
-    twim["twim"].append({"nick": message.user, "mxid": mxid,
-                         "message": message.text,
-                         "event_id": event["event_id"],
-                         "room": message.room})
+    post = {"nick": message.user, "mxid": mxid,
+            "message": message.text,
+            "event_id": event["event_id"],
+            "room": message.room}
 
+    twim["twim"].append(post)
     await opsdroid.memory.put("twim", twim)
 
     await message.respond(f"Thanks for the update {message.user}")
+
+    # Send the update to the echo room.
+    if "echo" in connector.rooms:
+        await message.respond(format_update(post), room="echo")
+
+
+def format_update(post):
+    post["message"] = post["message"].strip("TWIM: ").strip("TWIM").replace("\n", "\n>")
+    return post_template.format(**post)
 
 
 async def get_updates(opsdroid):
@@ -106,10 +116,7 @@ async def get_updates(opsdroid):
     """
     twim = await opsdroid.memory.get("twim")
     twim = twim if twim else {"twim": []}
-    twim = twim["twim"]
-    for post in twim:
-        post["message"] = post["message"].replace("TWIM: ", "").replace("TWIM", "").replace("\n", "\n>")
-    return [post_template.format(**post) for post in twim]
+    return [format_update(post) for post in twim["twim"]]
 
 
 @match_regex("^!get updates")
