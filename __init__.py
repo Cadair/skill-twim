@@ -13,6 +13,7 @@ from opsdroid.matchers import match_regex, match_always
 _LOGGER = logging.getLogger(__name__)
 
 # Templates for the !get updates command
+# TODO: Combine these with the jinja stuff somehow
 
 user_link = "https://matrix.to/#/{mxid}"
 event_link = "https://matrix.to/#/{room}/{event_id}"
@@ -27,10 +28,6 @@ post_template = """
 > {{message}}
 
 """.format(user_template=user_template)
-
-
-cwd = os.path.dirname(__file__)
-
 
 
 # Webserver Functions
@@ -64,6 +61,7 @@ def setup(opsdroid):
     Setup the skill. Register the twim route with the webserver.
     """
     app = opsdroid.web_server.web_app
+    cwd = os.path.dirname(__file__)
 
     markdownf = lambda text: jinja2.Markup(markdown.markdown(text))
     aiohttp_jinja2.setup(app,
