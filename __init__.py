@@ -1,4 +1,5 @@
 import os
+import random
 import logging
 from functools import partial
 
@@ -97,8 +98,11 @@ async def twim_bot(opsdroid, config, message):
 
     twim["twim"].append(post)
     await opsdroid.memory.put("twim", twim)
+    responses = (f"Thanks {post['nick']} I have saved your update.",
+                 f"Thanks for the update {post['nick']}.",
+                 f"{post['nick']}: I have stored your update.")
 
-    await message.respond(f"Thanks for the update {message.user}")
+    await message.respond(random.choice(responses))
 
     # Send the update to the echo room.
     if "echo" in connector.rooms:
