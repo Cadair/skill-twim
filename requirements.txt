@@ -1,3 +1,2 @@
 markdown
-aiohttp==3.0.5
 aiohttp_jinja2
