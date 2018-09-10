@@ -10,6 +10,7 @@ from aiohttp import web
 
 from opsdroid.matchers import match_regex, match_always
 
+_LOGGER = logging.getLogger(__name__)
 
 # Templates for the !get updates command
 
@@ -31,13 +32,23 @@ post_template = """
 cwd = os.path.dirname(__file__)
 
 
+
+# Webserver Functions
+
+async def prepare_twim_for_template(opsdroid):
+    api = opsdroid.default_connector.connection
+    twim = await opsdroid.memory.get("twim")
+    for t in twim["twim"]:
+        t["image"] = api.get_download_url(t["image"]) if ("image" in t and t["image"]) else None
+    return twim if twim else {"twim": []}
+
+
 @aiohttp_jinja2.template('updates.j2')
 async def updates_page(opsdroid, request):
     """
     Serve the updates summary page.
     """
-    twim = await opsdroid.memory.get("twim")
-    return twim if twim else {"twim": []}
+    return await prepare_twim_for_template(opsdroid)
 
 
 @aiohttp_jinja2.template('updates_md.j2')
@@ -45,8 +56,7 @@ async def updates_md(opsdroid, request):
     """
     Serve the updates summary page.
     """
-    twim = await opsdroid.memory.get("twim")
-    return twim if twim else {"twim": []}
+    return await prepare_twim_for_template(opsdroid)
 
 
 def setup(opsdroid):
@@ -64,49 +74,35 @@ def setup(opsdroid):
     app.router.add_get('/twim.md', partial(updates_md, opsdroid))
 
 
-@match_regex("^TWIM")
-async def twim_bot(opsdroid, config, message):
-    """
-    React to a TWIM post.
+# Helper Functions
 
-    Check the contents of the message then put it in the opsdroid memory.
-    """
+async def process_twim_event(opsdroid, roomid, event):
     connector = opsdroid.default_connector
-    bot_nick = connector.nick
-    bot_mxid = connector.mxid
-
-    if not bot_nick in message.text or bot_mxid in message.text:
-        return
-
-    event = message.raw_message
-    if not event:
-        return
-
-    if event["content"].get("m.relates_to", {}).get("m.in_reply_to", None):
-        return
 
     mxid = event["sender"]
+    nick = await connector._get_nick(roomid, event['sender'])
+    body = event['content']['body']
+
+    msgtype = event["content"]["msgtype"]
+    if msgtype == "m.image":
+        image = event['content']['url']
+    else:
+        image = None
+
+    post = {"nick": nick, "mxid": mxid,
+            "message": body,
+            "event_id": event["event_id"],
+            "room": roomid,
+            "image": image}
 
     twim = await opsdroid.memory.get("twim")
     if not twim:
         twim = {"twim": []}
 
-    post = {"nick": message.user, "mxid": mxid,
-            "message": message.text,
-            "event_id": event["event_id"],
-            "room": message.room}
-
     twim["twim"].append(post)
     await opsdroid.memory.put("twim", twim)
-    responses = (f"Thanks {post['nick']} I have saved your update.",
-                 f"Thanks for the update {post['nick']}.",
-                 f"{post['nick']}: I have stored your update.")
 
-    await message.respond(random.choice(responses))
-
-    # Send the update to the echo room.
-    if "echo" in connector.rooms:
-        await message.respond(markdown.markdown(format_update(post)), room="echo")
+    return post
 
 
 def format_update(post):
@@ -116,6 +112,8 @@ def format_update(post):
     else:
         message = message.replace("TWIM", "", 1)
     post["message"] = message.replace("\n", "\n>")
+    if "image" in post and post["image"]:
+        post["message"] = f"\n![]({post['image']})" + post["message"]
     return post_template.format(**post)
 
 
@@ -126,6 +124,47 @@ async def get_updates(opsdroid):
     twim = await opsdroid.memory.get("twim")
     twim = twim if twim else {"twim": []}
     return [format_update(post) for post in twim["twim"]]
+
+
+async def user_has_pl(api, room_id, mxid, pl=100):
+    """
+    Determine if a user is admin in a given room.
+    """
+    pls = await api.get_power_levels(room_id)
+    users = pls["users"]
+    user_pl = users.get(mxid, 0)
+    return user_pl == pl
+
+
+# Matcher Functions
+
+@match_regex("^TWIM")
+async def twim_bot(opsdroid, config, message):
+    """
+    React to a TWIM post.
+
+    Check the contents of the message then put it in the opsdroid memory.
+    """
+    connector = opsdroid.default_connector
+    event = message.raw_message
+    if not event:
+        return
+
+    reply_event_id = event["content"].get("m.relates_to", {}).get("m.in_reply_to", {}).get("event_id", None)
+    if reply_event_id:
+        event = await connector.connection.get_event_in_room(message.room, reply_event_id)
+
+    post = await process_twim_event(opsdroid, message.room, event)
+
+    responses = (f"Thanks {post['nick']} I have saved your update.",
+                 f"Thanks for the update {post['nick']}.",
+                 f"{post['nick']}: I have stored your update.")
+
+    await message.respond(random.choice(responses))
+
+    # Send the update to the echo room.
+    if "echo" in connector.rooms:
+        await message.respond(markdown.markdown(format_update(post)), room="echo")
 
 
 @match_regex("^!get updates")
@@ -149,16 +188,6 @@ async def update(opsdroid, config, message):
             return
         response = "\n".join(updates)
         await message.respond(markdown.markdown(response))
-
-
-async def user_has_pl(api, room_id, mxid, pl=100):
-    """
-    Determine if a user is admin in a given room.
-    """
-    pls = await api.get_power_levels(room_id)
-    users = pls["users"]
-    user_pl = users.get(mxid, 0)
-    return user_pl == pl
 
 
 @match_regex("^!clear updates")

@@ -15,6 +15,10 @@
           {{ update["message"]|replace("TWIM", "", 1)|markdown }}
         {% endif %}
 
+      {% if update["image"] %}
+        <img src="{{ update['image'] }}" alt="{{ update['message'] }}">
+      {% endif %}
+
       </blockquote>
 
     {% endfor %}
