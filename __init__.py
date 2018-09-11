@@ -74,12 +74,30 @@ def setup(opsdroid):
 
 # Helper Functions
 
+def trim_reply_fallback_text(text: str) -> str:
+    # Copyright (C) 2018 Tulir Asokan
+    # Borrowed from https://github.com/tulir/mautrix-telegram/blob/master/mautrix_telegram/formatter/util.py
+    # Having been given explicit permission to include it "under the terms of any OSI approved licence"
+    # https://matrix.to/#/!FPUfgzXYWTKgIrwKxW:matrix.org/$15365871364925maRqg:maunium.net
+
+    if not text.startswith("> ") or "\n" not in text:
+        return text
+    lines = text.split("\n")
+    while len(lines) > 0 and lines[0].startswith("> "):
+        lines.pop(0)
+    return "\n".join(lines).strip()
+
+
 async def process_twim_event(opsdroid, roomid, event):
     connector = opsdroid.default_connector
 
     mxid = event["sender"]
     nick = await connector._get_nick(roomid, event['sender'])
     body = event['content']['body']
+
+    # If this message is a reply then trim the reply fallback
+    if event["content"].get("m.relates_to", {}).get("m.in_reply_to", None):
+        body = trim_reply_fallback_text(body)
 
     msgtype = event["content"]["msgtype"]
     if msgtype == "m.image":
