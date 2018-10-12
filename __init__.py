@@ -172,7 +172,8 @@ async def twim_bot(opsdroid, config, message):
 
     post = await process_twim_event(opsdroid, message.room, event)
 
-    responses = (f"Thanks {post['nick']} I have saved your update.",
+    responses = (f"Thanks {post['nick']}; I have saved your update.",
+                 f"Thanks {post['nick']}! I have saved your update.",
                  f"Thanks for the update {post['nick']}.",
                  f"{post['nick']}: I have stored your update.")
 
