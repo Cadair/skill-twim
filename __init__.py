@@ -9,6 +9,7 @@ import aiohttp_jinja2
 from aiohttp import web
 
 from opsdroid.matchers import match_regex, match_always
+from opsdroid import events
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ async def updates_md(opsdroid, request):
     return await prepare_twim_for_template(opsdroid)
 
 
-def setup(opsdroid):
+def setup(opsdroid, config):
     """
     Setup the skill. Register the twim route with the webserver.
     """
@@ -92,7 +93,7 @@ async def process_twim_event(opsdroid, roomid, event):
     connector = opsdroid.default_connector
 
     mxid = event["sender"]
-    nick = await connector._get_nick(roomid, event['sender'])
+    nick = await connector.get_nick(roomid, event['sender'])
     body = event['content']['body']
 
     # If this message is a reply then trim the reply fallback
@@ -162,15 +163,15 @@ async def twim_bot(opsdroid, config, message):
     Check the contents of the message then put it in the opsdroid memory.
     """
     connector = opsdroid.default_connector
-    event = message.raw_message
+    event = message.raw_event
     if not event:
         return
 
     reply_event_id = event["content"].get("m.relates_to", {}).get("m.in_reply_to", {}).get("event_id", None)
     if reply_event_id:
-        event = await connector.connection.get_event_in_room(message.room, reply_event_id)
+        event = await connector.connection.get_event_in_room(message.target, reply_event_id)
 
-    post = await process_twim_event(opsdroid, message.room, event)
+    post = await process_twim_event(opsdroid, message.target, event)
 
     responses = (f"Thanks {post['nick']}; I have saved your update.",
                  f"Thanks {post['nick']}! I have saved your update.",
@@ -179,9 +180,11 @@ async def twim_bot(opsdroid, config, message):
 
     await message.respond(random.choice(responses))
 
+    await message.respond(events.Reaction('⭕'))
+
     # Send the update to the echo room.
     if "echo" in connector.rooms:
-        await message.respond(markdown.markdown(format_update(post)), room="echo")
+        await message.respond(events.Message(markdown.markdown(format_update(post)), target="echo"))
 
 
 @match_regex("^!get updates")
@@ -190,9 +193,9 @@ async def update(opsdroid, config, message):
     Send a message into the room with all the updates.
     """
     connector = opsdroid.default_connector
-    mxid = message.raw_message["sender"]
-    room_name = connector.get_roomname(message.room)
-    is_admin = await user_has_pl(connector.connection, message.room, mxid)
+    mxid = message.raw_event["sender"]
+    room_name = connector.get_roomname(message.target)
+    is_admin = await user_has_pl(connector.connection, message.target, mxid)
     if room_name == "main" and not is_admin:
         return
 
@@ -213,8 +216,8 @@ async def clear_updates(opsdroid, config, message):
     Admin command to clear the memory of the bot.
     """
     connector = opsdroid.default_connector
-    mxid = message.raw_message["sender"]
-    is_admin = await user_has_pl(connector.connection, message.room, mxid)
+    mxid = message.raw_event["sender"]
+    is_admin = await user_has_pl(connector.connection, message.target, mxid)
     if is_admin:
         await opsdroid.memory.put("twim", {"twim": []})
         await message.respond("Updates cleared")
