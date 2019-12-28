@@ -31,48 +31,6 @@ post_template = """
 """.format(user_template=user_template)
 
 
-# Webserver Functions
-
-async def prepare_twim_for_template(opsdroid):
-    api = opsdroid.default_connector.connection
-    twim = await opsdroid.memory.get("twim")
-    for t in twim["twim"]:
-        t["image"] = api.get_download_url(t["image"]) if ("image" in t and t["image"]) else None
-    return twim if twim else {"twim": []}
-
-
-@aiohttp_jinja2.template('updates.j2')
-async def updates_page(opsdroid, request):
-    """
-    Serve the updates summary page.
-    """
-    return await prepare_twim_for_template(opsdroid)
-
-
-@aiohttp_jinja2.template('updates_md.j2')
-async def updates_md(opsdroid, request):
-    """
-    Serve the updates summary page.
-    """
-    return await prepare_twim_for_template(opsdroid)
-
-
-def setup(opsdroid, config):
-    """
-    Setup the skill. Register the twim route with the webserver.
-    """
-    app = opsdroid.web_server.web_app
-    cwd = os.path.dirname(__file__)
-
-    markdownf = lambda text: jinja2.Markup(markdown.markdown(text))
-    aiohttp_jinja2.setup(app,
-                         loader=jinja2.FileSystemLoader(cwd),
-                         filters={"markdown": markdownf})
-
-    app.router.add_get('/twim', partial(updates_page, opsdroid))
-    app.router.add_get('/twim.md', partial(updates_md, opsdroid))
-
-
 # Helper Functions
 
 def trim_reply_fallback_text(text: str) -> str:
