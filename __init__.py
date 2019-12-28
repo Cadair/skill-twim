@@ -8,7 +8,7 @@ import markdown
 import aiohttp_jinja2
 from aiohttp import web
 
-from opsdroid.matchers import match_regex, match_always
+from opsdroid.matchers import match_regex, match_event
 from opsdroid import events
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,51 +31,33 @@ post_template = """
 """.format(user_template=user_template)
 
 
+MAGIC_EMOJI = '⭕'
+
+
 # Helper Functions
 
-def trim_reply_fallback_text(text: str) -> str:
-    # Copyright (C) 2018 Tulir Asokan
-    # Borrowed from https://github.com/tulir/mautrix-telegram/blob/master/mautrix_telegram/formatter/util.py
-    # Having been given explicit permission to include it "under the terms of any OSI approved licence"
-    # https://matrix.to/#/!FPUfgzXYWTKgIrwKxW:matrix.org/$15365871364925maRqg:maunium.net
-
-    if not text.startswith("> ") or "\n" not in text:
-        return text
-    lines = text.split("\n")
-    while len(lines) > 0 and lines[0].startswith("> "):
-        lines.pop(0)
-    return "\n".join(lines).strip()
-
-
-async def process_twim_event(opsdroid, roomid, event):
-    connector = opsdroid.default_connector
-
-    mxid = event["sender"]
-    nick = await connector.get_nick(roomid, event['sender'])
-    body = event['content']['body']
-
-    # If this message is a reply then trim the reply fallback
-    if event["content"].get("m.relates_to", {}).get("m.in_reply_to", None):
-        body = trim_reply_fallback_text(body)
-
-    msgtype = event["content"]["msgtype"]
-    if msgtype == "m.image":
-        image = event['content']['url']
-    else:
-        image = None
-
-    post = {"nick": nick, "mxid": mxid,
-            "message": body,
-            "event_id": event["event_id"],
-            "room": roomid,
-            "image": image}
-
+async def add_post_to_memory(opsdroid, roomid, post):
     twim = await opsdroid.memory.get("twim")
     if not twim:
         twim = {"twim": []}
 
     twim["twim"].append(post)
-    await opsdroid.memory.put("twim", twim)
+    return await opsdroid.memory.put("twim", twim)
+
+
+async def process_twim_event(opsdroid, roomid, event):
+    body = event.raw_event['content']['body']
+
+    image = None
+    if isinstance(event, events.Image):
+        image = event.url
+
+    post = {"nick": event.user,
+            "mxid": event.user_id,
+            "message": body,
+            "event_id": event.event_id,
+            "room": roomid,
+            "image": image}
 
     return post
 
@@ -110,8 +92,24 @@ async def user_has_pl(api, room_id, mxid, pl=100):
     user_pl = users.get(mxid, 0)
     return user_pl == pl
 
-
 # Matcher Functions
+
+@match_event(events.EditedMessage)
+async def twim_edit(opsdroid, config, edit):
+    """
+    """
+
+@match_event(events.Reaction)
+async def twim_reaction(opsdroid, config, reaction):
+    """
+    If the original poster reacts with the magic emoji then TWIM the post.
+    """
+    if (reaction.emoji != MAGIC_EMOJI
+        or reaction.user_id != reaction.linked_event.user_id):
+        return
+
+    return await twim_bot(opsdroid, config, reaction.linked_event)
+
 
 @match_regex("^TWIM")
 async def twim_bot(opsdroid, config, message):
@@ -121,15 +119,13 @@ async def twim_bot(opsdroid, config, message):
     Check the contents of the message then put it in the opsdroid memory.
     """
     connector = opsdroid.default_connector
-    event = message.raw_event
-    if not event:
-        return
 
-    reply_event_id = event["content"].get("m.relates_to", {}).get("m.in_reply_to", {}).get("event_id", None)
-    if reply_event_id:
-        event = await connector.connection.get_event_in_room(message.target, reply_event_id)
+    # If the message starts with TWIM and it's a reply then we use the parent event.
+    if isinstance(message, events.Reply):
+        message = message.linked_event
 
-    post = await process_twim_event(opsdroid, message.target, event)
+    post = await process_twim_event(opsdroid, message.target, message)
+    await add_post_to_memory(opsdroid, message.target, post)
 
     responses = (f"Thanks {post['nick']}; I have saved your update.",
                  f"Thanks {post['nick']}! I have saved your update.",
@@ -138,7 +134,7 @@ async def twim_bot(opsdroid, config, message):
 
     await message.respond(random.choice(responses))
 
-    await message.respond(events.Reaction('⭕'))
+    await message.respond(events.Reaction(MAGIC_EMOJI))
 
     # Send the update to the echo room.
     if "echo" in connector.rooms:
@@ -151,9 +147,8 @@ async def update(opsdroid, config, message):
     Send a message into the room with all the updates.
     """
     connector = opsdroid.default_connector
-    mxid = message.raw_event["sender"]
     room_name = connector.get_roomname(message.target)
-    is_admin = await user_has_pl(connector.connection, message.target, mxid)
+    is_admin = await user_has_pl(connector.connection, message.target, message.user_id)
     if room_name == "main" and not is_admin:
         return
 
@@ -174,8 +169,7 @@ async def clear_updates(opsdroid, config, message):
     Admin command to clear the memory of the bot.
     """
     connector = opsdroid.default_connector
-    mxid = message.raw_event["sender"]
-    is_admin = await user_has_pl(connector.connection, message.target, mxid)
+    is_admin = await user_has_pl(connector.connection, message.target, message.user_id)
     if is_admin:
         await opsdroid.memory.put("twim", {"twim": []})
         await message.respond("Updates cleared")
