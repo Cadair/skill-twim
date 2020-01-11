@@ -96,7 +96,6 @@ async def update_database(opsdroid, config, event):
     if twim is None:
         return
 
-    twim = twim['twim']
     if isinstance(twim, list):
         new_twim = {}
         for post in twim:
@@ -193,14 +192,11 @@ async def update(opsdroid, config, message):
         return
 
     updates = await get_updates(opsdroid)
-    twim = await opsdroid.memory.get("twim")
-    if twim:
-        twim = twim["twim"]
-        if not twim:
-            await message.respond("No updates yet.")
-            return
+    if updates:
         response = "\n".join(updates)
         await message.respond(markdown.markdown(response))
+    else:
+        await message.respond("No updates yet.")
 
 
 @match_regex("^!clear updates")
