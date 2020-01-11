@@ -2,6 +2,7 @@ import random
 import logging
 
 import markdown
+import matrix_client.errors
 
 from opsdroid.matchers import match_regex, match_event
 from opsdroid import events
@@ -40,7 +41,8 @@ async def process_twim_event(opsdroid, roomid, event):
 
     image = None
     if isinstance(event, events.Image):
-        image = event.url
+        # Get mxc:// url not http url.
+        image = event.raw_event['content']['url']
 
     post = {event.event_id: {"nick": event.user,
                              "mxid": event.user_id,
@@ -62,7 +64,7 @@ def format_update(post):
         message = message.replace("TWIM", "", 1)
     post["message"] = message.replace("\n", "\n>")
     if "image" in post and post["image"]:
-        post["message"] = f"\n![]({post['image']})" + post["message"]
+        post["message"] = f"\n![{post['message']}]({post['image']})"
     return post_template.format(**post)
 
 
@@ -167,7 +169,10 @@ async def twim_bot(opsdroid, config, message):
 
     await message.respond(events.Message(random.choice(responses)))
 
-    await message.respond(events.Reaction(MAGIC_EMOJI))
+    try:
+        await message.respond(events.Reaction(MAGIC_EMOJI))
+    except matrix_client.errors.MatrixRequestError:
+        pass
 
     # Send the update to the echo room.
     if "echo" in connector.rooms:
