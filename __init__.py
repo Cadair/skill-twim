@@ -165,7 +165,7 @@ async def twim_bot(opsdroid, config, message):
                  f"Thanks for the update {nick}.",
                  f"{nick}: I have stored your update.")
 
-    await message.respond(random.choice(responses))
+    await message.respond(events.Message(random.choice(responses)))
 
     await message.respond(events.Reaction(MAGIC_EMOJI))
 
