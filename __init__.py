@@ -129,17 +129,22 @@ async def twim_edit(opsdroid, config, edit):
                 markdown.markdown(format_update({original_event_id: post})),
                 target="echo",
                 linked_event=post['echo_event_id']))
-    
+
 
 @match_event(events.Reaction)
 async def twim_reaction(opsdroid, config, reaction):
     """
     If the original poster reacts with the magic emoji then TWIM the post.
     """
-    if (reaction.emoji != MAGIC_EMOJI
-        or reaction.user_id != reaction.linked_event.user_id):
-        return
+    _LOGGER.debug(f"Got reaction {reaction.emoji}")
 
+    if reaction.user_id != reaction.linked_event.user_id:
+        _LOGGER.debug("Ignoring reaction as not from original poster.")
+        if reaction.emoji != MAGIC_EMOJI:
+            _LOGGER.debug(f"Reaction {reaction.emoji} is not equal to {MAGIC_EMOJI}")
+            return
+
+    _LOGGER.debug(f"TWIMing original post {reaction.linked_event}")
     return await twim_bot(opsdroid, config, reaction.linked_event)
 
 
