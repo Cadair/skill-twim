@@ -136,7 +136,9 @@ async def twim_reaction(opsdroid, config, reaction):
     """
     If the original poster reacts with the magic emoji then TWIM the post.
     """
-    _LOGGER.debug(f"Got reaction {reaction.emoji}")
+    if not reaction.linked_event:
+        _LOGGER.error("The reaction object has not linked_event")
+        return
 
     if reaction.user_id != reaction.linked_event.user_id:
         _LOGGER.debug("Ignoring reaction as not from original poster.")
