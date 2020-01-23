@@ -140,14 +140,10 @@ async def twim_reaction(opsdroid, config, reaction):
         _LOGGER.error("The reaction object has not linked_event")
         return
 
-    if reaction.user_id != reaction.linked_event.user_id:
-        _LOGGER.debug("Ignoring reaction as not from original poster.")
-        if reaction.emoji != MAGIC_EMOJI:
-            _LOGGER.debug(f"Reaction {reaction.emoji} is not equal to {MAGIC_EMOJI}")
-            return
-
-    _LOGGER.debug(f"TWIMing original post {reaction.linked_event}")
-    return await twim_bot(opsdroid, config, reaction.linked_event)
+    if reaction.user_id == reaction.linked_event.user_id:
+        if reaction.emoji == MAGIC_EMOJI:
+            _LOGGER.debug(f"TWIMing original post {reaction.linked_event}")
+            return await twim_bot(opsdroid, config, reaction.linked_event)
 
 
 @match_regex("^TWIM")
