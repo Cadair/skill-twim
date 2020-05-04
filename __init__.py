@@ -1,7 +1,6 @@
 import random
 import logging
 
-import markdown
 import matrix_client.errors
 
 from opsdroid.matchers import match_regex, match_event
