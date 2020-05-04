@@ -137,7 +137,7 @@ async def twim_reaction(opsdroid, config, reaction):
     If the original poster reacts with the magic emoji then TWIM the post.
     """
     if not reaction.linked_event:
-        _LOGGER.error("The reaction object has not linked_event")
+        _LOGGER.error("The reaction object has not got a linked_event")
         return
 
     if reaction.user_id == reaction.linked_event.user_id:
@@ -145,8 +145,10 @@ async def twim_reaction(opsdroid, config, reaction):
             _LOGGER.debug(f"TWIMing original post {reaction.linked_event}")
             return await twim_bot(opsdroid, config, reaction.linked_event)
 
+    _LOGGER.debug("Reaction user did not equal linked event user.")
 
-@match_regex("^TWIM")
+
+@match_regex("^TWIM[:\s]")
 async def twim_bot(opsdroid, config, message):
     """
     React to a TWIM post.
@@ -155,13 +157,14 @@ async def twim_bot(opsdroid, config, message):
     """
     if isinstance(message, events.EditedMessage):
         return
-    connector = opsdroid.default_connector
 
     # If the message starts with TWIM and it's a reply then we use the parent event.
     if isinstance(message, events.Reply):
         message = message.linked_event
 
     post = await process_twim_event(opsdroid, message.target, message)
+    _LOGGER.debug(f"Processed TWIM event, got: {post}")
+
     content = list(post.values())[0]
     nick = content['nick']
 
@@ -175,13 +178,14 @@ async def twim_bot(opsdroid, config, message):
     try:
         await message.respond(events.Reaction(MAGIC_EMOJI))
     except matrix_client.errors.MatrixRequestError:
+        _LOGGER.error("Failed to react to submission with magic emoji.")
         pass
 
     # Send the update to the echo room.
-    if "echo" in connector.rooms:
+    if "echo" in message.connector.rooms:
+        formatted_body = message.raw_event["content"]["formatted_body"]
         echo_event_id = await message.respond(
-            events.Message(markdown.markdown(format_update(post)),
-                           target="echo"))
+            events.Message(formatted_body, target="echo"))
         echo_event_id = echo_event_id['event_id']
         content['echo_event_id'] = echo_event_id
 
