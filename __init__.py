@@ -1,30 +1,41 @@
-import random
+import re
 import logging
+import random
+import unicodedata
 
 import matrix_client.errors
 
-from opsdroid.matchers import match_regex, match_event
 from opsdroid import events
+from opsdroid.matchers import match_event, match_regex
 
 _LOGGER = logging.getLogger(__name__)
 
 user_link = "https://matrix.to/#/{mxid}"
 event_link = "https://matrix.to/#/{room}/{event_id}"
 
-user_template = "[{{nick}}]({user_link}) [reports that]({event_link}):".format(user_link=user_link,
-                                                                               event_link=event_link)
+user_template = ' <a href="{user_link}">{{nick}}</a> <a href="{event_link}">reports that</a>:'.format(user_link=user_link,
+                                                                                                      event_link=event_link)
 
 post_template = """
 {user_template}
+<p></p>
+<blockquote>
+{{message}}
+</blockquote>
 
+""" .format(user_template=user_template)
 
-> {{message}}
+MAGIC_EMOJI = '\u2b55'
 
-""".format(user_template=user_template)
-
-MAGIC_EMOJI = '⭕'
+TWIM_REGEX = "^TWIM[:\s]"
 
 # Helper Functions
+
+def emoji_is_magic(s1):
+    def NFD(s):
+        return unicodedata.normalize('NFD', s)
+    return NFD(MAGIC_EMOJI) in NFD(s1)
+
 
 async def add_post_to_memory(opsdroid, roomid, post):
     twim = await opsdroid.memory.get("twim")
@@ -36,7 +47,8 @@ async def add_post_to_memory(opsdroid, roomid, post):
 
 
 async def process_twim_event(opsdroid, roomid, event):
-    body = event.raw_event['content']['body']
+    body = event.raw_event['content'].get('formatted_body',
+                                          event.raw_event['content']['body'])
 
     image = None
     if isinstance(event, events.Image):
@@ -56,14 +68,12 @@ def format_update(post):
     event_id = list(post.keys())[0]
     post = post[event_id]
     post['event_id'] = event_id
-    message = post["message"]
-    if "TWIM: " in message:
-        message = message.replace("TWIM: ", "", 1)
-    else:
-        message = message.replace("TWIM", "", 1)
-    post["message"] = message.replace("\n", "\n>")
+    post["message"] = re.sub(TWIM_REGEX, "", post["message"])
+    post["message"] = re.sub('<a href="https://matrix.to/#/.*">TWIM</a>[:\s]', "", post["message"])
+
     if "image" in post and post["image"]:
-        post["message"] = f"\n![{post['message']}]({post['image']})"
+        post["message"] = f"<img src=\"{post['image']}\" alt=\"{post['message']}\" />"
+
     return post_template.format(**post)
 
 
@@ -125,7 +135,7 @@ async def twim_edit(opsdroid, config, edit):
 
         if 'echo_event_id' in post:
             await opsdroid.send(events.EditedMessage(
-                markdown.markdown(format_update({original_event_id: post})),
+                format_update({original_event_id: post}),
                 target="echo",
                 linked_event=post['echo_event_id']))
 
@@ -140,14 +150,13 @@ async def twim_reaction(opsdroid, config, reaction):
         return
 
     if reaction.user_id == reaction.linked_event.user_id:
-        if reaction.emoji == MAGIC_EMOJI:
+        if emoji_is_magic(reaction.emoji):
             _LOGGER.debug(f"TWIMing original post {reaction.linked_event}")
             return await twim_bot(opsdroid, config, reaction.linked_event)
 
-    _LOGGER.debug("Reaction user did not equal linked event user.")
 
 
-@match_regex("^TWIM[:\s]")
+@match_regex(TWIM_REGEX)
 async def twim_bot(opsdroid, config, message):
     """
     React to a TWIM post.
@@ -182,9 +191,8 @@ async def twim_bot(opsdroid, config, message):
 
     # Send the update to the echo room.
     if "echo" in message.connector.rooms:
-        formatted_body = message.raw_event["content"]["formatted_body"]
         echo_event_id = await message.respond(
-            events.Message(formatted_body, target="echo"))
+            events.Message(format_update(post), target="echo"))
         echo_event_id = echo_event_id['event_id']
         content['echo_event_id'] = echo_event_id
 
@@ -204,8 +212,8 @@ async def update(opsdroid, config, message):
 
     updates = await get_updates(opsdroid)
     if updates:
-        response = "\n".join(updates)
-        await message.respond(markdown.markdown(response))
+        response = "<br />".join(updates)
+        await message.respond(response)
     else:
         await message.respond("No updates yet.")
 
