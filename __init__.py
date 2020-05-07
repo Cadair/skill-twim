@@ -27,7 +27,7 @@ post_template = """
 
 MAGIC_EMOJI = '\u2b55'
 
-TWIM_REGEX = "^TWIM[:\s]"
+TWIM_REGEX = "^TWIM(?:[:\s]|$)"
 
 # Helper Functions
 
