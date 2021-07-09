@@ -3,10 +3,9 @@ import logging
 import random
 import unicodedata
 
-import matrix_client.errors
-
 from opsdroid import events
 from opsdroid.matchers import match_event, match_regex
+from opsdroid.connector.matrix.connector import MatrixException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -185,7 +184,7 @@ async def twim_bot(opsdroid, config, message):
 
     try:
         await message.respond(events.Reaction(MAGIC_EMOJI))
-    except matrix_client.errors.MatrixRequestError:
+    except MatrixException:
         _LOGGER.error("Failed to react to submission with magic emoji.")
         pass
 
