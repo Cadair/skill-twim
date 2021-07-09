@@ -128,7 +128,9 @@ async def twim_edit(opsdroid, config, edit):
     original_event_id = edit.linked_event.event_id
     if original_event_id in twim['twim']:
         post = twim['twim'][original_event_id]
-        post['message'] = edit.text
+        new_content = edit.raw_event['content']['m.new_content']
+        body = new_content.get('formatted_body', new_content['body'])
+        post['message'] = body
 
         await opsdroid.memory.put("twim", twim)
 
@@ -192,7 +194,7 @@ async def twim_bot(opsdroid, config, message):
     if "echo" in message.connector.rooms:
         echo_event_id = await message.respond(
             events.Message(format_update(post), target="echo"))
-        echo_event_id = echo_event_id['event_id']
+        echo_event_id = echo_event_id.event_id
         content['echo_event_id'] = echo_event_id
 
     await add_post_to_memory(opsdroid, message.target, post)
