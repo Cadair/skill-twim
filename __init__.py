@@ -25,6 +25,7 @@ post_template = """
 """ .format(user_template=user_template)
 
 MAGIC_EMOJI = '\u2b55'
+VARIATION_SELECTOR_16 = '\ufe0f'
 
 TWIM_REGEX = "^TWIM(?:[:\s]|$)"
 
@@ -185,7 +186,7 @@ async def twim_bot(opsdroid, config, message):
     await message.respond(events.Message(random.choice(responses)))
 
     try:
-        await message.respond(events.Reaction(MAGIC_EMOJI))
+        await message.respond(events.Reaction(MAGIC_EMOJI + VARIATION_SELECTOR_16))
     except MatrixException:
         _LOGGER.error("Failed to react to submission with magic emoji.")
         pass
