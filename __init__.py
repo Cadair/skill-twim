@@ -178,13 +178,6 @@ async def twim_bot(opsdroid, config, message):
     content = list(post.values())[0]
     nick = content['nick']
 
-    responses = (f"Thanks {nick}; I have saved your update.",
-                 f"Thanks {nick}! I have saved your update.",
-                 f"Thanks for the update {nick}.",
-                 f"{nick}: I have stored your update.")
-
-    await message.respond(events.Message(random.choice(responses)))
-
     try:
         await message.respond(events.Reaction(MAGIC_EMOJI + VARIATION_SELECTOR_16))
     except MatrixException:
